@@ -1,3 +1,9 @@
+# https://aistudio.google.com/docs/models
+# https://aistudio.google.com/docs/embeddings#quality-for-smaller-dimensions
+
+from functools import lru_cache
+
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -5,4 +11,17 @@ class Settings(BaseSettings):
     app_name: str = "studypilot"
     debug: bool = False
 
+    GOOGLE_API_KEYS: list[SecretStr] = Field(
+        default_factory=list,
+        description="Google API keys for rotation.",
+    )
+    GOOGLE_EMBEDDING_MODEL: str = "gemini-embedding-001"
+    # Have to manually normalize for non-3072 dimension with gemini-embedding-001 model
+    EMBEDDING_DIMENSION: int = 3072
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
