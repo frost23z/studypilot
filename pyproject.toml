@@ -56,6 +56,7 @@ lint.select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+"ingest.py" = [ "T201" ]
 "src/studypilot/__init__.py" = [ "T201" ]
 "tests/**/*.py" = [ "S101", "S105", "S106" ]
 
