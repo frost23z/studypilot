@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Have to manually normalize for non-3072 dimension with gemini-embedding-001 model
     EMBEDDING_DIMENSION: int = 3072
 
+    CHROMA_COLLECTION_NAME: str = "course_materials"
+    CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
