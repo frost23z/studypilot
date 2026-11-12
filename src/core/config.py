@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = 4
     MAX_QUERY_REWRITES: int = 2
 
+    TAVILY_API_KEY: SecretStr
+    TAVILY_MAX_RESULTS: int = 3
+
     CHROMA_COLLECTION_NAME: str = "course_materials"
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
 
