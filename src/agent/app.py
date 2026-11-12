@@ -1,5 +1,8 @@
+import os
+import sys
 from pathlib import Path
 
+from fastmcp.client.transports import StdioTransport
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_tavily import TavilySearch
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -12,6 +15,7 @@ from agent.tools import make_docs_tool
 from core.config import get_settings
 from embedding.gemini_embedding import get_embeddings
 from ingestion.manifest import IngestionManifest
+from notes.client import make_save_note
 from vector_store.chroma_store import get_vector_store
 
 settings = get_settings()
@@ -30,6 +34,14 @@ tavily = TavilySearch(
     max_results=settings.TAVILY_MAX_RESULTS,
 )
 
+notes_server = StdioTransport(
+    command=sys.executable,
+    args=["-m", "notes"],
+    env=dict(os.environ),
+    keep_alive=False,
+)
+save_note = make_save_note(notes_server)
+
 
 def create_graph(checkpointer: BaseCheckpointSaver | None = None):
     llm = ChatGoogleGenerativeAI(model=settings.GOOGLE_CHAT_MODEL, api_key=api_key)
@@ -45,7 +57,7 @@ def create_graph(checkpointer: BaseCheckpointSaver | None = None):
 
     docs_worker = build_docs_agent(llm, make_docs_tool(tavily))
 
-    return build_supervisor(llm, course_worker, docs_worker, checkpointer=checkpointer)
+    return build_supervisor(llm, course_worker, docs_worker, save_note, checkpointer=checkpointer)
 
 
 graph = create_graph()
