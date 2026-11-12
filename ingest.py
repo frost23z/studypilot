@@ -21,7 +21,9 @@ def ingest_documents():
         return 0
 
     settings = get_settings()
-    vector_store = get_vector_store(get_embeddings(settings.GOOGLE_API_KEYS[0]))
+    vector_store = get_vector_store(
+        get_embeddings(settings.GOOGLE_API_KEYS[settings.CURRENT_GOOGLE_API_KEY])
+    )
     manifest = IngestionManifest(Path(settings.CHROMA_PERSIST_DIRECTORY) / "manifest.sqlite3")
     indexed = manifest.hashes()
 

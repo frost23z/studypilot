@@ -15,10 +15,14 @@ class Settings(BaseSettings):
         default_factory=list,
         description="Google API keys for rotation.",
     )
+    CURRENT_GOOGLE_API_KEY: int = 0
+    GOOGLE_CHAT_MODEL: str = "gemini-3.5-flash-lite"
     GOOGLE_EMBEDDING_MODEL: str = "gemini-embedding-001"
     # Have to manually normalize for non-3072 dimension with gemini-embedding-001 model
     EMBEDDING_DIMENSION: int = 3072
     EMBEDDING_BATCH_SIZE: int = 100
+
+    RETRIEVAL_TOP_K: int = 4
 
     CHROMA_COLLECTION_NAME: str = "course_materials"
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
