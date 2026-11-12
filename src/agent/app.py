@@ -4,7 +4,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_tavily import TavilySearch
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
+from agent.docs_agent import build_docs_agent
+from agent.prompts import COURSE_WORKER_PROMPT
 from agent.rag import build_graph
+from agent.supervisor import build_supervisor
 from agent.tools import make_docs_tool
 from core.config import get_settings
 from embedding.gemini_embedding import get_embeddings
@@ -29,15 +32,20 @@ tavily = TavilySearch(
 
 
 def create_graph(checkpointer: BaseCheckpointSaver | None = None):
-    return build_graph(
+    llm = ChatGoogleGenerativeAI(model=settings.GOOGLE_CHAT_MODEL, api_key=api_key)
+
+    course_worker = build_graph(
         vector_store=get_vector_store(get_embeddings(api_key)),
-        llm=ChatGoogleGenerativeAI(model=settings.GOOGLE_CHAT_MODEL, api_key=api_key),
+        llm=llm,
         top_k=settings.RETRIEVAL_TOP_K,
         max_rewrites=settings.MAX_QUERY_REWRITES,
         search_filter=manifest.active_filter,
-        docs_tool=make_docs_tool(tavily),
-        checkpointer=checkpointer,
+        system_prompt=COURSE_WORKER_PROMPT,
     )
+
+    docs_worker = build_docs_agent(llm, make_docs_tool(tavily))
+
+    return build_supervisor(llm, course_worker, docs_worker, checkpointer=checkpointer)
 
 
 graph = create_graph()
