@@ -23,6 +23,7 @@ def create_graph(checkpointer: BaseCheckpointSaver | None = None):
         vector_store=get_vector_store(get_embeddings(api_key)),
         llm=ChatGoogleGenerativeAI(model=settings.GOOGLE_CHAT_MODEL, api_key=api_key),
         top_k=settings.RETRIEVAL_TOP_K,
+        max_rewrites=settings.MAX_QUERY_REWRITES,
         search_filter=manifest.active_filter,
         checkpointer=checkpointer,
     )

@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     EMBEDDING_BATCH_SIZE: int = 100
 
     RETRIEVAL_TOP_K: int = 4
+    MAX_QUERY_REWRITES: int = 2
 
     CHROMA_COLLECTION_NAME: str = "course_materials"
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
