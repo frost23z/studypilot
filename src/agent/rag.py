@@ -59,6 +59,7 @@ def build_graph(
     max_rewrites: int = 2,
     search_filter: Callable[[], dict | None] | None = None,
     docs_tool: BaseTool | None = None,
+    system_prompt: str = SYSTEM_PROMPT,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledStateGraph:
     retrieve = make_retrieve_tool(vector_store, top_k, search_filter)
@@ -67,7 +68,7 @@ def build_graph(
     grader = llm.with_structured_output(Grade)
 
     def agent(state: State) -> dict:
-        response = llm_with_tools.invoke([SystemMessage(SYSTEM_PROMPT), *state["messages"]])
+        response = llm_with_tools.invoke([SystemMessage(system_prompt), *state["messages"]])
         return {"messages": [response], "rewrites": 0}
 
     def grade_documents(state: State) -> Literal["agent", "rewrite"]:
