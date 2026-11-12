@@ -6,7 +6,14 @@ from typing import Literal
 from uuid import uuid4
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
+from langchain_core.tools import BaseTool
 from langchain_core.vectorstores import VectorStore
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import START, MessagesState, StateGraph
@@ -34,6 +41,16 @@ def last_question(messages: list[AnyMessage]) -> str:
     return ""
 
 
+def latest_tool_results(messages: list[AnyMessage]) -> list[ToolMessage]:
+    """The tool results added since the model last spoke."""
+    results = []
+    for message in reversed(messages):
+        if not isinstance(message, ToolMessage):
+            break
+        results.append(message)
+    return results
+
+
 def build_graph(
     vector_store: VectorStore,
     llm: BaseChatModel,
@@ -41,10 +58,11 @@ def build_graph(
     top_k: int = 4,
     max_rewrites: int = 2,
     search_filter: Callable[[], dict | None] | None = None,
+    docs_tool: BaseTool | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> CompiledStateGraph:
     retrieve = make_retrieve_tool(vector_store, top_k, search_filter)
-    tools = [retrieve]
+    tools = [retrieve, docs_tool] if docs_tool else [retrieve]
     llm_with_tools = llm.bind_tools(tools)
     grader = llm.with_structured_output(Grade)
 
@@ -53,9 +71,13 @@ def build_graph(
         return {"messages": [response], "rewrites": 0}
 
     def grade_documents(state: State) -> Literal["agent", "rewrite"]:
-        if state.get("rewrites", 0) >= max_rewrites:
-            return "agent"
-        passages = state["messages"][-1].text
+        # Only the course search is graded. Official docs results go straight to the model.
+        course_results = [
+            m for m in latest_tool_results(state["messages"]) if m.name == retrieve.name
+        ]
+        if not course_results or state.get("rewrites", 0) >= max_rewrites:
+            return "agent"  # nothing to grade, or tried enough already
+        passages = course_results[0].text
         prompt = GRADE_PROMPT.format(question=last_question(state["messages"]), passages=passages)
         grade = Grade.model_validate(grader.invoke([HumanMessage(prompt)]))
         return "agent" if grade.relevant else "rewrite"
@@ -71,7 +93,7 @@ def build_graph(
 
     builder = StateGraph(State)  # pyrefly: ignore[bad-specialization]
     builder.add_node("agent", agent)
-    builder.add_node("tools", ToolNode(tools))
+    builder.add_node("tools", ToolNode(tools, handle_tool_errors=True))
     builder.add_node("rewrite", rewrite)
 
     builder.add_edge(START, "agent")
