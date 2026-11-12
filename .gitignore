@@ -224,3 +224,6 @@ __marimo__/
 
 # test outputs
 tests/output*
+
+# notes database
+notes.sqlite3*

@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     CHROMA_COLLECTION_NAME: str = "course_materials"
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
 
+    NOTES_DB_PATH: str = "./notes.sqlite3"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
