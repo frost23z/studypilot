@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     GOOGLE_EMBEDDING_MODEL: str = "gemini-embedding-001"
     # Have to manually normalize for non-3072 dimension with gemini-embedding-001 model
     EMBEDDING_DIMENSION: int = 3072
+    EMBEDDING_BATCH_SIZE: int = 100
 
     CHROMA_COLLECTION_NAME: str = "course_materials"
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
