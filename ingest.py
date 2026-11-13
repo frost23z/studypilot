@@ -15,12 +15,12 @@ LOADERS = {".pdf": load_pdf, ".md": load_markdown}
 
 
 def ingest_documents():
-    input_dir = Path("documents")
+    settings = get_settings()
+    input_dir = Path(settings.DOCUMENTS_DIR)
     files = {p.name: p for p in sorted(input_dir.iterdir()) if p.suffix.lower() in LOADERS}
     if not files:
         return 0
 
-    settings = get_settings()
     vector_store = get_vector_store(
         get_embeddings(settings.GOOGLE_API_KEYS[settings.CURRENT_GOOGLE_API_KEY])
     )
