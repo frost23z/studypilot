@@ -13,7 +13,8 @@ st.set_page_config(page_title="StudyPilot", page_icon="📚")
 st.title("StudyPilot")
 
 
-def new_chat(thread_id: str) -> None:
+def open_chat(thread_id: str) -> None:
+    """Show one chat. A thread_id nobody used yet is a new, empty chat."""
     st.session_state.thread_id = thread_id
     st.session_state.messages = []
     st.session_state.pending_note = None
@@ -21,40 +22,45 @@ def new_chat(thread_id: str) -> None:
     st.query_params["thread"] = thread_id  # a page refresh keeps the same chat
 
 
-# ---- Sidebar: who is chatting, new chat, remembered facts, saved notes ----
-
 with st.sidebar:
     name = st.text_input("Your name", value=st.query_params.get("user", "")).strip().lower()
     if name:
         st.query_params["user"] = name
         st.session_state.user = name  # the Memories page starts from this name
-    if st.button("New chat", disabled=not name):
-        new_chat(uuid.uuid4().hex)
-        st.rerun()
 
 if not name:
     st.info("Enter your name in the sidebar to start. It keeps your memory separate.")
     st.stop()
 
 if "thread_id" not in st.session_state:
-    new_chat(st.query_params.get("thread") or uuid.uuid4().hex)
+    open_chat(st.query_params.get("thread") or uuid.uuid4().hex)
+    st.session_state.chat_user = name
+elif st.session_state.chat_user != name:
+    open_chat(uuid.uuid4().hex)  # another person's chat must not stay open
+    st.session_state.chat_user = name
 
 with st.sidebar:
-    st.subheader("What StudyPilot remembers")
-    facts = call("GET", f"/memories/{name}")
-    for fact in facts or []:
-        text_column, delete_column = st.columns([5, 1])
-        text_column.write(fact["text"])
-        if delete_column.button("✕", key=f"delete-{fact['id']}", help="Forget this"):
-            call("DELETE", f"/memories/{name}/{fact['id']}")
-            st.rerun()
-    if facts == []:
-        st.caption("Nothing yet. Tell it your level or what you are learning.")
+    if st.button("New chat", icon=":material/add:", width="stretch"):
+        open_chat(uuid.uuid4().hex)
+        st.rerun()
 
-    with st.expander("Saved notes"):
-        for note in call("GET", "/notes") or []:
-            st.markdown(f"**{note['title']}**")
-            st.text(note["content"])
+    st.subheader("Chats")
+    current = st.session_state.thread_id
+    threads = call("GET", f"/threads/{name}") or []
+    if current not in {thread["thread_id"] for thread in threads}:
+        # A new chat has no message yet, so the server does not list it. Show it anyway.
+        threads = [{"thread_id": current, "title": "New chat"}, *threads]
+    for thread in threads:
+        is_open = thread["thread_id"] == current
+        clicked = st.button(
+            thread["title"],
+            key=f"thread-{thread['thread_id']}",
+            type="primary" if is_open else "secondary",
+            width="stretch",
+        )
+        if clicked and not is_open:
+            open_chat(thread["thread_id"])
+            st.rerun()
 
 # load the saved messages the first time this chat is shown
 if st.session_state.loaded_thread != st.session_state.thread_id:
