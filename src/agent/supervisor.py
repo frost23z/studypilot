@@ -2,20 +2,30 @@ from collections.abc import Awaitable, Callable
 from typing import Literal
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import Runnable
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.runtime import Runtime
+from langgraph.store.base import BaseStore
 from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
-from agent.prompts import ANSWER_PROMPT, NO_RESULTS, NOTES_WORKER_PROMPT, SUPERVISOR_PROMPT
+from agent.prompts import (
+    ANSWER_PROMPT,
+    MEMORY_PROMPT,
+    NO_RESULTS,
+    NOTES_WORKER_PROMPT,
+    SUPERVISOR_PROMPT,
+)
+from memory.facts import add_facts, list_facts
 
 NextStep = Literal["course_worker", "docs_worker", "notes_worker", "answer"]
 
 
 class State(MessagesState):
+    user_id: str
     next_step: str
     course_notes: str  # course worker's latest findings
     docs_notes: str  # docs worker's latest findings
@@ -26,6 +36,10 @@ class State(MessagesState):
 class Note(BaseModel):
     title: str = Field(description="Short title, a few words")
     content: str = Field(description="The note: 3 to 8 short plain lines")
+
+
+class Facts(BaseModel):
+    facts: list[str] = Field(description="New short facts about the intern, or an empty list")
 
 
 class Route(BaseModel):
@@ -39,9 +53,11 @@ def build_supervisor(
     save_note: Callable[[str, str], Awaitable[str]],
     *,
     checkpointer: BaseCheckpointSaver | None = None,
+    store: BaseStore | None = None,
 ) -> CompiledStateGraph:
     router = llm.with_structured_output(Route)
     note_writer = llm.with_structured_output(Note)
+    fact_finder = llm.with_structured_output(Facts)
 
     def supervisor(state: State) -> dict:
         status = (
@@ -90,13 +106,17 @@ def build_supervisor(
             return {"note_result": "The intern chose not to save the note. Nothing was saved."}
         return {"note_result": await save_note(draft["title"], draft["content"])}
 
-    def answer(state: State) -> dict:
+    async def answer(state: State, runtime: Runtime) -> dict:
+        facts = []
+        if runtime.store is not None:
+            facts = await list_facts(runtime.store, state.get("user_id") or "default")
         prompt = ANSWER_PROMPT.format(
             course_notes=state.get("course_notes") or "(not searched)",
             docs_notes=state.get("docs_notes") or "(not searched)",
             note_result=state.get("note_result") or "(no note requested)",
+            memories="\n".join(f"- {fact['text']}" for fact in facts) or "(nothing yet)",
         )
-        response = llm.invoke([SystemMessage(prompt), *state["messages"]])
+        response = await llm.ainvoke([SystemMessage(prompt), *state["messages"]])
         # clear the worker results for the next question
         return {
             "messages": [response],
@@ -105,6 +125,27 @@ def build_supervisor(
             "note_draft": {},
             "note_result": "",
         }
+
+    async def remember(state: State, runtime: Runtime) -> dict:
+        # Looks only at the intern's own latest message, never at tool results or web pages,
+        # so text from the internet can't write into the intern's memory.
+        if runtime.store is None:
+            return {}
+        user_id = state.get("user_id") or "default"
+        last_message = next(
+            (m for m in reversed(state["messages"]) if isinstance(m, HumanMessage)), None
+        )
+        if last_message is None:
+            return {}
+        known = await list_facts(runtime.store, user_id)
+        prompt = MEMORY_PROMPT.format(
+            known="\n".join(f"- {fact['text']}" for fact in known) or "(nothing yet)"
+        )
+        result = Facts.model_validate(
+            await fact_finder.ainvoke([SystemMessage(prompt), last_message])
+        )
+        await add_facts(runtime.store, user_id, result.facts)
+        return {}
 
     def pick_worker(state: State) -> NextStep:
         return state["next_step"]  # pyrefly: ignore[bad-return]
@@ -116,6 +157,7 @@ def build_supervisor(
     builder.add_node("notes_worker", notes_node)
     builder.add_node("save_note", save_note_node)
     builder.add_node("answer", answer)
+    builder.add_node("remember", remember)
 
     builder.add_edge(START, "supervisor")
     builder.add_conditional_edges("supervisor", pick_worker)
@@ -123,6 +165,7 @@ def build_supervisor(
     builder.add_edge("docs_worker", "supervisor")
     builder.add_edge("notes_worker", "save_note")
     builder.add_edge("save_note", "supervisor")
-    builder.add_edge("answer", END)
+    builder.add_edge("answer", "remember")
+    builder.add_edge("remember", END)
 
-    return builder.compile(checkpointer=checkpointer)
+    return builder.compile(checkpointer=checkpointer, store=store)

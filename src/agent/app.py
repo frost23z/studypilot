@@ -6,6 +6,7 @@ from fastmcp.client.transports import StdioTransport
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_tavily import TavilySearch
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.store.base import BaseStore
 
 from agent.docs_agent import build_docs_agent
 from agent.prompts import COURSE_WORKER_PROMPT
@@ -43,7 +44,7 @@ notes_server = StdioTransport(
 save_note = make_save_note(notes_server)
 
 
-def create_graph(checkpointer: BaseCheckpointSaver | None = None):
+def create_graph(checkpointer: BaseCheckpointSaver | None = None, store: BaseStore | None = None):
     llm = ChatGoogleGenerativeAI(model=settings.GOOGLE_CHAT_MODEL, api_key=api_key)
 
     course_worker = build_graph(
@@ -57,7 +58,9 @@ def create_graph(checkpointer: BaseCheckpointSaver | None = None):
 
     docs_worker = build_docs_agent(llm, make_docs_tool(tavily))
 
-    return build_supervisor(llm, course_worker, docs_worker, save_note, checkpointer=checkpointer)
+    return build_supervisor(
+        llm, course_worker, docs_worker, save_note, checkpointer=checkpointer, store=store
+    )
 
 
 graph = create_graph()
