@@ -227,3 +227,5 @@ tests/output*
 
 # notes database
 notes.sqlite3*
+chat_memory.sqlite3*
+long_term_memory.sqlite3*

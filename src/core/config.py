@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     CHROMA_PERSIST_DIRECTORY: str = "./chroma_langchain_db"
 
     NOTES_DB_PATH: str = "./notes.sqlite3"
+    CHECKPOINT_DB_PATH: str = "./chat_memory.sqlite3"
+    MEMORY_DB_PATH: str = "./long_term_memory.sqlite3"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
