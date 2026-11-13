@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: studypilot-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /docs
+    envVars:
+      - key: GOOGLE_API_KEYS
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+  - type: web
+    name: studypilot-web
+    runtime: docker
+    plan: free
+    envVars:
+      - key: APP
+        value: web
+      - key: STUDYPILOT_API_URL
+        value: https://studypilot-qz9b.onrender.com
+      - key: STUDYPILOT_PUBLIC_API_URL
+        value: https://studypilot-qz9b.onrender.com
