@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     RETRIEVAL_TOP_K: int = 4
     MAX_QUERY_REWRITES: int = 2
 
+    # When a chat has more messages than SUMMARY_AFTER_MESSAGES, the older ones are summarized
+    # and only the last SUMMARY_KEEP_MESSAGES are kept. One question and one answer are 2.
+    SUMMARY_AFTER_MESSAGES: int = 10
+    SUMMARY_KEEP_MESSAGES: int = 4
+
     TAVILY_API_KEY: SecretStr
     TAVILY_MAX_RESULTS: int = 3
 
