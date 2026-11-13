@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
@@ -41,6 +41,17 @@ class ChatResponse(BaseModel):
     pending_note: PendingNote | None
 
 
+class HistoryMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str
+
+
+class HistoryResponse(BaseModel):
+    thread_id: str
+    messages: list[HistoryMessage]  # old messages are gone once a long chat was summarized
+    pending_note: PendingNote | None  # set while a note waits for approval
+
+
 def make_config(thread_id: str) -> RunnableConfig:
     # recursion_limit stops the supervisor loop if it never settles on an answer.
     return {"configurable": {"thread_id": thread_id}, "recursion_limit": 12}
@@ -57,6 +68,21 @@ async def run(graph: CompiledStateGraph, graph_input, thread_id: str) -> ChatRes
         draft = result["__interrupt__"][0].value
         return ChatResponse(thread_id=thread_id, reply=None, pending_note=PendingNote(**draft))
     return ChatResponse(thread_id=thread_id, reply=result["messages"][-1].text, pending_note=None)
+
+
+@router.get("/{thread_id}")
+async def history(thread_id: str, graph: Graph) -> HistoryResponse:
+    """What the chat shows: the saved messages of one thread. Empty for a new thread."""
+    state = await graph.aget_state(make_config(thread_id))
+    messages = []
+    for message in state.values.get("messages", []):
+        if isinstance(message, HumanMessage) and message.text:
+            messages.append(HistoryMessage(role="user", text=message.text))
+        elif isinstance(message, AIMessage) and message.text:
+            messages.append(HistoryMessage(role="assistant", text=message.text))
+    draft = next((task.interrupts[0].value for task in state.tasks if task.interrupts), None)
+    pending_note = PendingNote(**draft) if draft else None
+    return HistoryResponse(thread_id=thread_id, messages=messages, pending_note=pending_note)
 
 
 @router.post("")

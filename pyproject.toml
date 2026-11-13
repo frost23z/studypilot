@@ -28,6 +28,7 @@ dependencies = [
   "pydantic>=2.14.3",
   "pydantic-settings>=2.16.2",
   "sqlalchemy>=2.1.8",
+  "streamlit>=1.67",
 ]
 scripts.studypilot = "studypilot:main"
 
