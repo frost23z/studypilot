@@ -7,6 +7,8 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from api.threads import Threads
+
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
@@ -86,20 +88,24 @@ async def history(thread_id: str, graph: Graph) -> HistoryResponse:
 
 
 @router.post("")
-async def chat(body: ChatRequest, graph: Graph) -> ChatResponse:
+async def chat(body: ChatRequest, graph: Graph, threads: Threads) -> ChatResponse:
     if await is_waiting_for_approval(graph, make_config(body.thread_id)):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "A note is waiting for approval. Answer it with POST /chat/approve first.",
         )
     graph_input = {"messages": [HumanMessage(body.message)], "user_id": body.user_id}
-    return await run(graph, graph_input, body.thread_id)
+    response = await run(graph, graph_input, body.thread_id)
+    threads.touch(body.thread_id, body.user_id, body.message)  # lists the chat for its owner
+    return response
 
 
 @router.post("/approve")
-async def approve(body: ApproveRequest, graph: Graph) -> ChatResponse:
+async def approve(body: ApproveRequest, graph: Graph, threads: Threads) -> ChatResponse:
     if not await is_waiting_for_approval(graph, make_config(body.thread_id)):
         raise HTTPException(
             status.HTTP_409_CONFLICT, "Nothing is waiting for approval in this thread."
         )
-    return await run(graph, Command(resume=body.approved), body.thread_id)
+    response = await run(graph, Command(resume=body.approved), body.thread_id)
+    threads.bump(body.thread_id)
+    return response

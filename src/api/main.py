@@ -12,9 +12,10 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.store.base import BaseStore
 from langgraph.store.sqlite.aio import AsyncSqliteStore
 
-from api import chat, memories, notes
+from api import chat, memories, notes, threads
 from core.config import get_settings
 from notes.store import NotesStore
+from threads.store import ThreadsStore
 
 
 def create_app(
@@ -24,6 +25,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         settings = get_settings()
         app.state.store = NotesStore(settings.NOTES_DB_PATH)
+        app.state.threads = ThreadsStore(settings.THREADS_DB_PATH)
         # Chat memory (one thread) and long-term memory (across threads) are separate files.
         async with (
             AsyncSqliteSaver.from_conn_string(settings.CHECKPOINT_DB_PATH) as saver,
@@ -44,6 +46,7 @@ def create_app(
     app.include_router(notes.router)
     app.include_router(chat.router)
     app.include_router(memories.router)
+    app.include_router(threads.router)
     return app
 
 
