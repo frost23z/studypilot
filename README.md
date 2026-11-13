@@ -73,6 +73,16 @@ memory separate from other people's.
 | Notes | Every saved note, newest first. |
 | Memories | The facts it remembers about you. Remove any with the ✕ button. |
 
+On the chat page:
+
+- **Chats.** The sidebar lists your chats, the most recently used first, named after the first
+  question. Click one to go back to it. **New chat** starts an empty one. Each name has its own
+  list of chats.
+- **Sources.** When an answer cites your course materials, for example
+  `[Technical Best Practice.pdf, page 12]`, the answer shows a *Sources* line under it. Each link
+  opens that file in a new browser tab. A PDF opens at the cited page. A Markdown file opens as
+  plain text.
+
 The API is expected at `http://localhost:8000`. If it runs somewhere else, set
 `STUDYPILOT_API_URL` before starting Streamlit:
 
@@ -80,23 +90,30 @@ The API is expected at `http://localhost:8000`. If it runs somewhere else, set
 STUDYPILOT_API_URL=http://localhost:9000 uv run streamlit run src/frontend/app.py
 ```
 
+Source links are opened by your browser, which may reach the API at a different address than the
+Streamlit server does (for example when the two run in containers). Set
+`STUDYPILOT_PUBLIC_API_URL` to the address your browser can use. It defaults to
+`STUDYPILOT_API_URL`.
+
 ## API endpoints
 
 | Method and path | What it does |
 | --- | --- |
-| `POST /chat` | Send a message. The answer, or a note waiting for approval, comes back. |
+| `POST /chat` | Send a message. The answer and the files it cites, or a note waiting for approval, come back. |
 | `POST /chat/approve` | Save (`true`) or drop (`false`) the note that is waiting. |
-| `GET /chat/{thread_id}` | The saved messages of one chat. |
+| `GET /chat/{thread_id}` | The saved messages of one chat, with the files each answer cites. |
 | `GET /notes`, `POST /notes` | List notes, add a note. |
 | `GET /notes/{id}`, `PUT /notes/{id}`, `DELETE /notes/{id}` | Read, replace, delete one note. |
+| `GET /threads/{user_id}` | The chats of one person, the most recently used first. |
 | `GET /memories/{user_id}` | The facts remembered about one person. |
 | `DELETE /memories/{user_id}/{fact_id}` | Forget one fact. |
+| `GET /documents/{filename}` | A PDF or Markdown file from `documents/`, to show in the browser. |
 
 ## Other commands
 
 ```bash
 uv run langgraph dev   # open the agent in LangGraph Studio to see each step of a run
-uv run pytest          # run the tests
+uv run pytest          # run the tests (the API tests use a fake agent, no keys needed)
 uv run pyrefly check   # type check
 ```
 
@@ -108,8 +125,13 @@ These are created in the project root the first time they are needed, and are no
 - `notes.sqlite3` holds the saved notes.
 - `chat_memory.sqlite3` holds the chats.
 - `long_term_memory.sqlite3` holds the remembered facts.
+- `threads.sqlite3` holds the list of chats shown in the sidebar.
 
 To start fresh, stop the API and delete the file you want to reset.
+
+Chats from before the chat list existed are not in the list, because only the messages were
+saved. Their messages are still in `chat_memory.sqlite3`, and a chat opens if you know its id:
+add `&thread=<id>` to the page address.
 
 ## Troubleshooting
 
@@ -117,6 +139,10 @@ To start fresh, stop the API and delete the file you want to reset.
   address. Start it, or set `STUDYPILOT_API_URL`.
 - **The API stops at start with "Set GOOGLE_API_KEYS in .env"**: the `.env` file is missing, or
   you ran the command from another folder.
+- **A source link says "Document not found"**: the file is not in `documents/` any more, or the
+  API was started from another folder. Set `DOCUMENTS_DIR` in `.env` if the files live elsewhere.
+- **A source link does not open**: the browser cannot reach the API at the address in the link.
+  Set `STUDYPILOT_PUBLIC_API_URL`.
 - **Answers say nothing about your course**: run `uv run python ingest.py` first.
 - **Ingest fails on a PDF**: check that Java is installed. Failed files are tried again on the
   next run.
