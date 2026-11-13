@@ -27,6 +27,7 @@ with st.sidebar:
     name = st.text_input("Your name", value=st.query_params.get("user", "")).strip().lower()
     if name:
         st.query_params["user"] = name
+        st.session_state.user = name  # the Memories page starts from this name
     if st.button("New chat", disabled=not name):
         new_chat(uuid.uuid4().hex)
         st.rerun()
