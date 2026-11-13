@@ -59,7 +59,14 @@ def create_graph(checkpointer: BaseCheckpointSaver | None = None, store: BaseSto
     docs_worker = build_docs_agent(llm, make_docs_tool(tavily))
 
     return build_supervisor(
-        llm, course_worker, docs_worker, save_note, checkpointer=checkpointer, store=store
+        llm,
+        course_worker,
+        docs_worker,
+        save_note,
+        checkpointer=checkpointer,
+        store=store,
+        summary_after=settings.SUMMARY_AFTER_MESSAGES,
+        keep_messages=settings.SUMMARY_KEEP_MESSAGES,
     )
 
 
