@@ -7,10 +7,29 @@ import uuid
 
 import streamlit as st
 
-from frontend.client import call
+from frontend.client import call, source_label, source_url
 
 st.set_page_config(page_title="StudyPilot", page_icon="📚")
 st.title("StudyPilot")
+
+
+def show_sources(sources: list[dict]) -> None:
+    if sources:
+        links = " · ".join(f"[{source_label(s)}]({source_url(s)})" for s in sources)
+        st.caption(f"📄 Sources: {links}")
+
+
+def show_message(message: dict) -> None:
+    with st.chat_message(message["role"]):
+        st.markdown(message["text"])
+        show_sources(message.get("sources", []))
+
+
+def add_reply(result: dict) -> None:
+    if result["reply"]:
+        st.session_state.messages.append(
+            {"role": "assistant", "text": result["reply"], "sources": result["sources"]}
+        )
 
 
 def open_chat(thread_id: str) -> None:
@@ -72,8 +91,7 @@ if st.session_state.loaded_thread != st.session_state.thread_id:
     st.session_state.loaded_thread = st.session_state.thread_id
 
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["text"])
+    show_message(message)
 
 note = st.session_state.pending_note
 if note:
@@ -92,8 +110,7 @@ if note:
             result = call("POST", "/chat/approve", json=body)
         if result:
             st.session_state.pending_note = None
-            if result["reply"]:
-                st.session_state.messages.append({"role": "assistant", "text": result["reply"]})
+            add_reply(result)
             st.rerun()
 
 question = st.chat_input("Ask about your course", disabled=note is not None)
@@ -107,6 +124,5 @@ if question:
         st.session_state.messages.pop()  # the question was not answered, so ask again
     else:
         st.session_state.pending_note = result["pending_note"]
-        if result["reply"]:
-            st.session_state.messages.append({"role": "assistant", "text": result["reply"]})
+        add_reply(result)
         st.rerun()
