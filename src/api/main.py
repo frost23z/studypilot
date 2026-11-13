@@ -5,6 +5,7 @@ doppler run -- uv run uvicorn api.main:app --reload
 
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -12,7 +13,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.store.base import BaseStore
 from langgraph.store.sqlite.aio import AsyncSqliteStore
 
-from api import chat, memories, notes, threads
+from api import chat, documents, memories, notes, threads
 from core.config import get_settings
 from notes.store import NotesStore
 from threads.store import ThreadsStore
@@ -26,6 +27,7 @@ def create_app(
         settings = get_settings()
         app.state.store = NotesStore(settings.NOTES_DB_PATH)
         app.state.threads = ThreadsStore(settings.THREADS_DB_PATH)
+        app.state.documents = Path(settings.DOCUMENTS_DIR)
         # Chat memory (one thread) and long-term memory (across threads) are separate files.
         async with (
             AsyncSqliteSaver.from_conn_string(settings.CHECKPOINT_DB_PATH) as saver,
@@ -47,6 +49,7 @@ def create_app(
     app.include_router(chat.router)
     app.include_router(memories.router)
     app.include_router(threads.router)
+    app.include_router(documents.router)
     return app
 
 
