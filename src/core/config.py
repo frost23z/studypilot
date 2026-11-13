@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     NOTES_DB_PATH: str = "./notes.sqlite3"
     CHECKPOINT_DB_PATH: str = "./chat_memory.sqlite3"
     MEMORY_DB_PATH: str = "./long_term_memory.sqlite3"
+    THREADS_DB_PATH: str = "./threads.sqlite3"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
